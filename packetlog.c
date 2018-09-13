@@ -70,12 +70,14 @@ unsigned long flags;
 * log_end is array of packet end
 * buffer_row packet_buf[buffer_row]
 * main_flag initialization only ...
+* packet_num all reserved
 */
 struct proc_dir_entry *proc_entry;
 unsigned int packet_n;
 int buffer_row;
 int i, j, n, m;
 bool main_flag = false; //初期化用
+unsigned int packet_num;
 
 typedef struct packet_header{
   unsigned int packet_num;
@@ -129,7 +131,7 @@ static ssize_t proc_read(struct file *fp, char __user *buf, size_t size, loff_t 
   printk("read call count=%d\n",(int)size);
 
     spin_lock_irqsave(&log_lock, flags);
-    for(i=0; i < buffer_1->log_end; i++)
+    for(i=0; i < buffer[x]->log_end; i++)
     {
       p_temp[i] = buffer[x]->buf[i];
     }
@@ -138,7 +140,7 @@ static ssize_t proc_read(struct file *fp, char __user *buf, size_t size, loff_t 
 
 
   spin_lock_irqsave(&log_lock, flags);
-  if (copy_to_user(buf, p_temp, temp) {
+  if (copy_to_user(buf, p_temp, temp)){
     kfree(p_temp);
     goto out;
   }else{
@@ -229,8 +231,8 @@ static unsigned int payload_dump(unsigned int hooknum,
     //初期化系関数ここで初期化
     if (main_flag == false){
       //packet_bufの先頭アドレスヲぶち込む
-      buffer_p = buffer_1->buf;
       buffer_row = 1;
+      buffer_p = buffer[buffer_row]->buf;
       main_flag = true;
     }
 
@@ -285,11 +287,10 @@ static unsigned int payload_dump(unsigned int hooknum,
     * this part is　reserved packet_buf(in callback func)
     *
     */
-    packet_buf_t buffer[2];
+    packet_buf_t p_buffer[2];
     /*buffer init*/
-    buffer[0] = buffer[0];
-    buffer[1] = buffer[1];
     for(i=0; i<packet_n; i++){
+      buffer[i] = p_buffer[i];      
       buffer[i]->buf = kmalloc(sizeof(char *)*BUFFER_SIZE), GFP_KERNEL);
       buffer[i]->log_end = 0;
     }
