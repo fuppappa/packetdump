@@ -241,7 +241,7 @@ static unsigned int payload_dump(unsigned int hooknum,
     packet_head.packet_len = skb->tail;
 
     //ここでバッファno書き込み開始ポインタを更新
-    if((BUFFER_SIZE - (buffer+buffer_row)->log_end < skb->tail)
+    if(BUFFER_SIZE - (buffer+buffer_row)->log_end < skb->tail)
     {
       if(!buffer_row){
         buffer_p = (buffer+buffer_row)->buf;
