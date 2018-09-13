@@ -130,13 +130,13 @@ static ssize_t proc_read(struct file *fp, char __user *buf, size_t size, loff_t 
   x = buffer_row;
   printk("read call count=%d\n",(int)size);
 
-    spin_lock_irqsave(&log_lock, flags);
-    for(i=0; i < (buffer+x)->log_end; i++)
-    {
-      p_temp[i] = (buffer+x)->buf[i];
-    }
-    temp = (buffer+x)->log_end;
-    spin_unlock_irqrestore(&log_lock, flags);
+  spin_lock_irqsave(&log_lock, flags);
+  for(i=0; i < (buffer+x)->log_end; i++)
+  {
+    p_temp[i] = (buffer+x)->buf[i];
+  }
+  temp = (buffer+x)->log_end;
+  spin_unlock_irqrestore(&log_lock, flags);
 
 
   spin_lock_irqsave(&log_lock, flags);
@@ -232,12 +232,12 @@ static unsigned int payload_dump(unsigned int hooknum,
     if (main_flag == false){
       //packet_bufの先頭アドレスヲぶち込む
       buffer_row = 0;
-      buffer_p = buffer[buffer_row]->buf;
+      buffer_p = buffer->buf;
       main_flag = true;
     }
 
     //ここではヘッダヲ作ってる
-    packet_head.packet_num = paket_num;
+    packet_head.packet_num = packet_num;
     packet_head.packet_len = skb->tail;
 
     //ここでバッファno書き込み開始ポインタを更新
@@ -316,8 +316,8 @@ static unsigned int payload_dump(unsigned int hooknum,
     printk("refused packetdump_mod");
     printk(KERN_INFO "%s\n", __FUNCTION__);
     proc_close();
-    kfree(buffer[0]->buf);
-    kfree(buffer[1]->buf);
+    kfree((buffer)->buf);
+    kfree((buffer+1)->buf);
 
   }
 
