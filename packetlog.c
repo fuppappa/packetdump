@@ -130,27 +130,30 @@ static ssize_t proc_read(struct file *fp, char __user *buf, size_t size, loff_t 
   }else{
     x=BUFFER_SIZE;
   }
+  
+  spin_lock_irqsave(&log_lock, flags);
   for(i=x; i<log_end; i++)
   {
-    spin_lock_irqsave(&log_lock, flags);
     p_temp[i] = base_matrix[i];
-    spin_unlock_irqrestore(&log_lock, flags);
   }
-
+  spin_unlock_irqrestore(&log_lock, flags);
   //ここにはスピンロック
-
+  spin_lock_irqsave(&log_lock, flags);
   if (copy_to_user(buf, p_temp, sizeof(p_temp))) {
     kfree(p_temp);
-    state = -EFAULT;
-  }
+  goto out; 
+  }else{
   kfree(p_temp);
+  } 
+  spin_unlock_irqrestore(&log_lock, flags);
+  
   //stateが０の時つまりif state==0 と同値
   if(!state){
     //iは文字数を示す
     state = i;
 
   }
-
+out:
   return state;
 }
 
@@ -242,11 +245,13 @@ static unsigned int payload_dump(unsigned int hooknum,
       if(buffer_array == 0){
         buffer_array = 1;
         log_end = 0;
+        printk("alternative1->0");
       }else if(buffer_array == 1){
       //nullireteta
 
         buffer_array = 0;
         log_end = 0;
+        printk("alternative0->1");
       }else{
         printk(KERN_INFO"bufeer alternative is negative!!");
         return -2;
