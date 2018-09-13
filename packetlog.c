@@ -90,7 +90,7 @@ typedef struct packet_buf{
   unsigned int log_end;
 } packet_buf_t;
 
-packet_buf_t *buffer[2];
+packet_buf_t *buffer;
 const char proc_buf[BUFFER_SIZE];
 //main module
 
@@ -131,11 +131,11 @@ static ssize_t proc_read(struct file *fp, char __user *buf, size_t size, loff_t 
   printk("read call count=%d\n",(int)size);
 
     spin_lock_irqsave(&log_lock, flags);
-    for(i=0; i < buffer[x]->log_end; i++)
+    for(i=0; i < (buffer+x)->log_end; i++)
     {
-      p_temp[i] = buffer[x]->buf[i];
+      p_temp[i] = (buffer+x)->buf[i];
     }
-    temp = buffer[x]->log_end;
+    temp = (buffer+x)->log_end;
     spin_unlock_irqrestore(&log_lock, flags);
 
 
@@ -151,7 +151,7 @@ static ssize_t proc_read(struct file *fp, char __user *buf, size_t size, loff_t 
   //stateが０の時つまりif state==0 と同値
   if(!state){
     //iは文字数を示す
-    state = log_end;
+    state = (buffer+x)->log_end;
   }
   out:
   return state;
@@ -231,7 +231,7 @@ static unsigned int payload_dump(unsigned int hooknum,
     //初期化系関数ここで初期化
     if (main_flag == false){
       //packet_bufの先頭アドレスヲぶち込む
-      buffer_row = 1;
+      buffer_row = 0;
       buffer_p = buffer[buffer_row]->buf;
       main_flag = true;
     }
@@ -241,17 +241,17 @@ static unsigned int payload_dump(unsigned int hooknum,
     packet_head.packet_len = skb->tail;
 
     //ここでバッファno書き込み開始ポインタを更新
-    if((BUFFER_SIZE - buffer[buffer_row-1]->log_end < skb->tail)
+    if((BUFFER_SIZE - (buffer+buffer_row)->log_end < skb->tail)
     {
-      if(buffer_row == 1){
-        buffer_p = buffer[0]->buf;
-        buffer[0]->log_end = 0;
-        buffer_row = 1;
+      if(!buffer_row){
+        buffer_p = (buffer+buffer_row)->buf;
+        (buffer+buffer_row)->log_end = 0;
+        buffer_row = 0;
         printk("alternative1->0");
-      }else if(buffer_row == 2){
-        buffer_p = buffer[1]->buf;
-        buffer[1]->log_end = 0;
-        buffer_row = 2;
+      }else if(buffer_row){
+        buffer_p = (buffer+buffer_row)->buf;
+        (buffer+buffer_row)->log_end = 0;
+        buffer_row = 1;
         printk("alternative0->1");
       }else{
         printk(KERN_INFO"bufeer alternative is negative!!");
@@ -262,10 +262,10 @@ static unsigned int payload_dump(unsigned int hooknum,
     //ここで実際にバッファに挿入
     memcpy(buffer_p, &packet_head, sizeof(packet_head));
     buffer_p = buffer_p + sizeof(packet_head);
-    buffer[buffer_row-1]->log_end = buffer[buffer_row-1]->log_end + sizeof(packet_head);
+    (buffer+buffer_row)->log_end = (buffer+buffer_row)->log_end + sizeof(packet_head);
     memcpy(buffer_p , skb->data, skb->tail);
     buffer_p = buffer_p + skb->tail;
-    buffer[buffer_row-1]->log_end = buffer[buffer_row-1]->log_end + skb->tail;
+    (buffer+buffer_row)->log_end = (buffer+buffer_row)->log_end + skb->tail;
 
     printk("skb->tail:%d\n", skb->tail);
 
@@ -289,10 +289,10 @@ static unsigned int payload_dump(unsigned int hooknum,
     */
     packet_buf_t p_buffer[2];
     /*buffer init*/
+    buffer = p_buffer;
     for(i=0; i<packet_n; i++){
-      buffer[i] = p_buffer[i];      
-      buffer[i]->buf = kmalloc(sizeof(char *)*BUFFER_SIZE), GFP_KERNEL);
-      buffer[i]->log_end = 0;
+      (buffer+i)->buf = kmalloc(sizeof(char *)*BUFFER_SIZE, GFP_KERNEL);
+      (buffer+i)->log_end = 0;
     }
 
     nfhook.hook     = payload_dump;
