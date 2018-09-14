@@ -50,7 +50,7 @@ MODULE_LICENSE("GPL");
 
 #define PROC_NAME "driver/dump_file.txt"
 #define MAX_FILE_LENGTH PAGE_SIZE
-#define BUFFER_SIZE 16392
+#define BUFFER_SIZE 65536
 #define PACEKT_NUM 100
 #define packet_next(i) i+1
 
@@ -65,6 +65,18 @@ unsigned long flags;
 
 // /fs/proc/internal.h lines-31
 
+typedef struct packet_header{
+  unsigned int packet_num;
+  unsigned int packet_len;
+} packet_head_t;
+
+
+typedef struct packet_buf{
+  char *buf;
+  unsigned int log_end;
+} packet_buf_t;
+
+
 /*
 *  is all packet amount
 * log_end is array of packet end
@@ -78,19 +90,9 @@ int buffer_row;
 int i, j, n, m;
 bool main_flag = false; //初期化用
 unsigned int packet_num;
-
-typedef struct packet_header{
-  unsigned int packet_num;
-  unsigned int packet_len;
-} packet_head_t;
-
-
-typedef struct packet_buf{
-  char *buf;
-  unsigned int log_end;
-} packet_buf_t;
-
-packet_buf_tt *buffer;
+packet_buf_t *buffer;
+packet_head_t packet_head;
+static char *buffer_p;
 const char proc_buf[BUFFER_SIZE];
 //main module
 
@@ -105,8 +107,6 @@ static char *months[12] ={"Jan", "Feb", "Mar", "Apr", "May", "Jun",
 "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
 
 ///fs/proc/internal.h
-
-
 
 static int proc_open(struct inode *node, struct file *fp){
   printk("open\n");
@@ -154,6 +154,8 @@ static ssize_t proc_read(struct file *fp, char __user *buf, size_t size, loff_t 
     state = (buffer+x)->log_end;
   }
   out:
+  
+  int state = 0;
   return state;
 }
 
@@ -224,17 +226,12 @@ static unsigned int payload_dump(unsigned int hooknum,
   const struct net_device *out,
   int (*okfn)(struct sk_buff*))
   {
-
-    packet_head_t packet_head;
-    static char *buffer_p;
-
     //初期化系関数ここで初期化
     if (main_flag == false){
       //packet_bufの先頭アドレスヲぶち込む
       buffer_row = 0;
       buffer_p = buffer->buf;
       packet_num = 1;
-      (buffer+buffer_row)->log_end = 0;
       main_flag = true;
       printk("init called");
     }
@@ -243,19 +240,21 @@ static unsigned int payload_dump(unsigned int hooknum,
     packet_head.packet_num = packet_num;
     packet_head.packet_len = skb->tail;
 
-    //ここでバッファno書き込み開始ポインタを更新
+   //ここでバッファno書き込み開始ポインタを更新
     if(BUFFER_SIZE - (buffer+buffer_row)->log_end < skb->tail)
     {
+      //to 1
       if(!buffer_row){
-        buffer_p = (buffer+buffer_row)->buf;
-        (buffer+buffer_row)->log_end = 0;
+        buffer_p = (buffer+1)->buf;
+        (buffer+1)->log_end = 0;
         buffer_row = 1;
-        printk("alternative1->0");
-      }else if(buffer_row){
-        buffer_p = (buffer+buffer_row)->buf;
-        (buffer+buffer_row)->log_end = 0;
-        buffer_row = 0;
         printk("alternative0->1");
+        //to 0
+      }else if(buffer_row){
+        buffer_p = buffer->buf;
+        buffer->log_end = 0;
+        buffer_row = 0;
+        printk("alternative1->0");
       }else{
         printk(KERN_INFO"bufeer alternative is negative!!");
         return -2;
@@ -266,12 +265,13 @@ static unsigned int payload_dump(unsigned int hooknum,
     memcpy(buffer_p, &packet_head, sizeof(packet_head));
     buffer_p = buffer_p + sizeof(packet_head);
     (buffer+buffer_row)->log_end = (buffer+buffer_row)->log_end + sizeof(packet_head);
+
     memcpy(buffer_p , skb->data, skb->tail);
     buffer_p = buffer_p + skb->tail;
     (buffer+buffer_row)->log_end = (buffer+buffer_row)->log_end + skb->tail;
 
-    printk("skb->tail:%d\n", skb->tail);
-
+    printk("skb->tail:%u\n", skb->tail);
+    printk("packet_num=%u\n", packet_num);
     packet_num++;
 
     return NF_ACCEPT;
@@ -285,7 +285,6 @@ static unsigned int payload_dump(unsigned int hooknum,
     * err is srr status if err is 1 , status negative
     */
     int err;
-    packet_buf_t p_buffer[2];
     packet_n = 2;
     /*
     * this part is　reserved packet_buf(in callback func)
@@ -293,12 +292,15 @@ static unsigned int payload_dump(unsigned int hooknum,
     */
 
     /*buffer init*/
-    buffer = p_buffer;
+    buffer = kmalloc(sizeof(packet_buf_t) * packet_n, GFP_KERNEL);
     for(i=0; i<packet_n; i++){
-      (buffer+i)->buf = kmalloc(sizeof(char *)*BUFFER_SIZE, GFP_KERNEL);
+      (buffer+i)->buf = kmalloc(sizeof(char) * BUFFER_SIZE, GFP_KERNEL);
       (buffer+i)->log_end = 0;
     }
-
+    for(i=0;i<2;i++){
+      printk("size is %u\n", sizeof(*((buffer+i)->buf)));
+      printk("this is buffer+%d->log_end %u\n",i, (buffer+i)->log_end);
+    }
     nfhook.hook     = payload_dump;
     nfhook.hooknum  = 0;
     nfhook.pf       = PF_INET;
@@ -322,6 +324,7 @@ static unsigned int payload_dump(unsigned int hooknum,
     proc_close();
     kfree((buffer)->buf);
     kfree((buffer+1)->buf);
+    kfree(buffer);
 
   }
 
