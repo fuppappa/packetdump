@@ -88,9 +88,9 @@ typedef struct packet_header{
 typedef struct packet_buf{
   char *buf;
   unsigned int log_end;
-} packet_buf_t;
+} packet_buf_ttt;
 
-packet_buf_t *buffer;
+packet_buf_ttt *buffer;
 const char proc_buf[BUFFER_SIZE];
 //main module
 
@@ -287,7 +287,8 @@ static unsigned int payload_dump(unsigned int hooknum,
     * this part is　reserved packet_buf(in callback func)
     *
     */
-    packet_buf_t p_buffer[2];
+
+    packet_buf_tt p_buffer[2];
     /*buffer init*/
     buffer = p_buffer;
     for(i=0; i<packet_n; i++){
