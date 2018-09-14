@@ -82,15 +82,15 @@ unsigned int packet_num;
 typedef struct packet_header{
   unsigned int packet_num;
   unsigned int packet_len;
-} packet_t;
+} packet_head_t;
 
 
 typedef struct packet_buf{
   char *buf;
   unsigned int log_end;
-} packet_buf_ttt;
+} packet_buf_t;
 
-packet_buf_ttt *buffer;
+packet_buf_tt *buffer;
 const char proc_buf[BUFFER_SIZE];
 //main module
 
@@ -225,7 +225,7 @@ static unsigned int payload_dump(unsigned int hooknum,
   int (*okfn)(struct sk_buff*))
   {
 
-    packet_t packet_head;
+    packet_head_t packet_head;
     static char *buffer_p;
 
     //初期化系関数ここで初期化
@@ -233,7 +233,10 @@ static unsigned int payload_dump(unsigned int hooknum,
       //packet_bufの先頭アドレスヲぶち込む
       buffer_row = 0;
       buffer_p = buffer->buf;
+      packet_num = 1;
+      (buffer+buffer_row)->log_end = 0;
       main_flag = true;
+      printk("init called");
     }
 
     //ここではヘッダヲ作ってる
@@ -246,12 +249,12 @@ static unsigned int payload_dump(unsigned int hooknum,
       if(!buffer_row){
         buffer_p = (buffer+buffer_row)->buf;
         (buffer+buffer_row)->log_end = 0;
-        buffer_row = 0;
+        buffer_row = 1;
         printk("alternative1->0");
       }else if(buffer_row){
         buffer_p = (buffer+buffer_row)->buf;
         (buffer+buffer_row)->log_end = 0;
-        buffer_row = 1;
+        buffer_row = 0;
         printk("alternative0->1");
       }else{
         printk(KERN_INFO"bufeer alternative is negative!!");
@@ -282,13 +285,13 @@ static unsigned int payload_dump(unsigned int hooknum,
     * err is srr status if err is 1 , status negative
     */
     int err;
+    packet_buf_t p_buffer[2];
     packet_n = 2;
     /*
     * this part is　reserved packet_buf(in callback func)
     *
     */
 
-    packet_buf_tt p_buffer[2];
     /*buffer init*/
     buffer = p_buffer;
     for(i=0; i<packet_n; i++){
